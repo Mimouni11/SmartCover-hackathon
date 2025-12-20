@@ -1,0 +1,56 @@
+car_feater = {
+    "ID": [],
+    "KIDSDRIV": [],
+    "BIRTH": [],
+    "AGE": [],
+    "HOMEKIDS": [],
+    "YOJ": [],
+    "INCOME": [],
+    "PARENT1": [],
+    "HOME_VAL": [],
+    "MSTATUS": [],
+    "GENDER": [],
+    "EDUCATION": [],
+    "OCCUPATION": [],
+    "TRAVTIME": [],
+    "CAR_USE": [],
+    "BLUEBOOK": [],
+    "TIF": [],
+    "CAR_TYPE": [],
+    "RED_CAR": [],
+    "OLDCLAIM": [],
+    "CLM_FREQ": [],
+    "REVOKED": [],
+    "MVR_PTS": [],
+    "CLM_AMT": [],
+    "CAR_AGE": [],
+    "CLAIM_FLAG": [],
+    "URBANICITY": []
+}
+
+
+
+house_feater = {
+    "house_age": [],
+    "house_size": [],
+    "num_rooms": [],
+    "num_bathrooms": [],
+    "location": [],
+    "building_material": [],
+    "security_features": [],
+    "previous_claims": [],
+    "insurance_cost": []
+}
+
+
+
+health_feater = {
+    "age": [],
+    "sex": [],
+    "bmi": [],
+    "children": [],
+    "smoker": [],
+    "region": [],
+    "charges": []
+}
+
