@@ -3,7 +3,7 @@ Prompts for Mistral LLM to extract structured insurance claim data.
 Supports French and English inputs.
 """
 
-from templates import TEMPLATES, ENUMS, get_required_fields, get_all_fields
+from .templates import TEMPLATES, ENUMS, get_required_fields, get_all_fields
 
 
 SYSTEM_PROMPT = """Tu es un assistant d'assurance intelligent spécialisé dans l'extraction d'informations structurées à partir de descriptions en langage naturel.

@@ -1,49 +1,55 @@
 """
-Configuration for Ollama and Mistral LLM.
-Adjust these settings based on your hardware and needs.
+Configuration for OpenRouter API with Claude Sonnet.
 """
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Ollama settings
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")  # or "mistral:7b", "mixtral:8x7b"
+# Load .env from project root
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
+
+# OpenRouter settings
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Model settings
+MODEL_NAME = "anthropic/claude-3.5-sonnet"  # or "anthropic/claude-3-haiku" for faster/cheaper
 
 # LLM parameters
 LLM_CONFIG = {
-    "model": OLLAMA_MODEL,
-    "temperature": 0.1,  # Low for structured extraction (more deterministic)
-    "top_p": 0.9,
-    "top_k": 40,
-    "num_predict": 2048,  # Max tokens to generate
-    "stop": None,  # No stop sequences needed
+    "model": MODEL_NAME,
+    "temperature": 0.1,  # Low for structured extraction
+    "max_tokens": 2048,
 }
 
 # Timeout settings
-REQUEST_TIMEOUT = 60  # seconds - increase if using large models
-MAX_RETRIES = 3  # Retry on failure
+REQUEST_TIMEOUT = 60
+MAX_RETRIES = 3
 
 # Date handling
 DEFAULT_DATE_FORMAT = "%Y-%m-%d"
 DEFAULT_TIME_FORMAT = "%H:%M"
 
 # Confidence thresholds
-MIN_CONFIDENCE_THRESHOLD = 0.5  # Below this, ask for clarification
-HIGH_CONFIDENCE_THRESHOLD = 0.8  # Above this, proceed without followup
-
-# Validation
-STRICT_MODE = True  # Validate against templates strictly
-ALLOW_UNKNOWN_FIELDS = False  # Reject fields not in templates
+MIN_CONFIDENCE_THRESHOLD = 0.5
+HIGH_CONFIDENCE_THRESHOLD = 0.8
 
 # Logging
-DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
-LOG_PROMPTS = DEBUG_MODE  # Log prompts to console for debugging
-LOG_RESPONSES = DEBUG_MODE  # Log raw LLM responses
+DEBUG_MODE = os.getenv("DEBUG_MODE", "true").lower() == "true"
+LOG_PROMPTS = DEBUG_MODE
+LOG_RESPONSES = DEBUG_MODE
 
 
-def get_ollama_url() -> str:
-    """Get the full Ollama API URL."""
-    return f"{OLLAMA_BASE_URL}/api/generate"
+def get_api_key() -> str:
+    """Get the OpenRouter API key."""
+    return OPENROUTER_API_KEY
+
+
+def get_api_url() -> str:
+    """Get the OpenRouter API URL."""
+    return OPENROUTER_BASE_URL
 
 
 def get_model_config() -> dict:
@@ -51,69 +57,29 @@ def get_model_config() -> dict:
     return LLM_CONFIG.copy()
 
 
-# Hardware optimization hints
-HARDWARE_PROFILES = {
-    "cpu_only": {
-        "model": "mistral:7b",
-        "num_predict": 1024,
-        "temperature": 0.1,
-    },
-    "gpu_available": {
-        "model": "mixtral:8x7b",
-        "num_predict": 2048,
-        "temperature": 0.1,
-    },
-    "fast_demo": {
-        "model": "mistral:7b",
-        "num_predict": 512,
-        "temperature": 0.0,  # Most deterministic
-    }
-}
-
-
-def set_hardware_profile(profile: str):
-    """
-    Set hardware-optimized config.
-
-    Args:
-        profile: "cpu_only" | "gpu_available" | "fast_demo"
-    """
-    global LLM_CONFIG
-    if profile in HARDWARE_PROFILES:
-        LLM_CONFIG.update(HARDWARE_PROFILES[profile])
-        print(f"✓ Hardware profile set to: {profile}")
-        print(f"  Model: {LLM_CONFIG['model']}")
-    else:
-        print(f"✗ Unknown profile: {profile}")
-        print(f"  Available: {list(HARDWARE_PROFILES.keys())}")
-
-
-# Quick check function
-def check_ollama_available() -> bool:
-    """
-    Check if Ollama is running and accessible.
-    Returns True if available, False otherwise.
-    """
+def check_api_available() -> bool:
+    """Check if OpenRouter API is accessible."""
     import requests
     try:
-        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        response = requests.get(
+            "https://openrouter.ai/api/v1/models",
+            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            timeout=5
+        )
         return response.status_code == 200
     except:
         return False
 
 
 if __name__ == "__main__":
-    # Quick test when running config.py directly
     print("=== OneClaim LLM Config ===")
-    print(f"Ollama URL: {OLLAMA_BASE_URL}")
-    print(f"Model: {OLLAMA_MODEL}")
+    print(f"API: OpenRouter")
+    print(f"Model: {MODEL_NAME}")
     print(f"Temperature: {LLM_CONFIG['temperature']}")
-    print(f"Max tokens: {LLM_CONFIG['num_predict']}")
-    print(f"\nChecking Ollama availability...")
+    print(f"Max tokens: {LLM_CONFIG['max_tokens']}")
+    print(f"\nChecking API availability...")
 
-    if check_ollama_available():
-        print("✓ Ollama is running!")
+    if check_api_available():
+        print("OpenRouter API is accessible!")
     else:
-        print("✗ Ollama not accessible")
-        print(f"  Make sure Ollama is running on {OLLAMA_BASE_URL}")
-        print(f"  Run: ollama serve")
+        print("OpenRouter API not accessible - check your API key")

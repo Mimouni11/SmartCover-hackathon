@@ -8,7 +8,7 @@ Usage:
     python chat.py
 """
 
-from main import structure_claim
+from .main import structure_claim
 import json
 
 

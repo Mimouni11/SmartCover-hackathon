@@ -1,0 +1,80 @@
+{
+  "user_123": {
+    "auto": {
+      "AGE": 35,
+      "INCOME": 50000,
+      "KIDSDRIV": 0,
+      "HOMEKIDS": 1,
+      "YOJ": 10,
+      "HOME_VAL": 150000,
+      "MSTATUS": "Married",
+      "GENDER": "M",
+      "EDUCATION": "Bachelors",
+      "OCCUPATION": "Professional",
+      "TRAVTIME": 30,
+      "CAR_USE": "Private",
+      "BLUEBOOK": 15000,
+      "TIF": 5,
+      "CAR_TYPE": "SUV",
+      "RED_CAR": "no",
+      "OLDCLAIM": 0,
+      "CLM_FREQ": 0,
+      "REVOKED": "No",
+      "MVR_PTS": 0,
+      "URBANICITY": "Highly Urban/ Urban",
+      "CAR_AGE": 3
+    },
+    "health": {
+      "age": 35,
+      "sex": "male",
+      "bmi": 25.5,
+      "children": 1,
+      "smoker": "no",
+      "region": "northwest"
+    },
+    "home": {
+      "house_age": 15,
+      "house_size": 2000,
+      "num_rooms": 4,
+      "num_bathrooms": 2,
+      "location": "urban",
+      "building_material": "brick",
+      "security_features": "alarm",
+      "previous_claims": 0
+    }
+  },
+  "user_456": {
+    "auto": {
+      "AGE": 28,
+      "INCOME": 35000,
+      "KIDSDRIV": 0,
+      "HOMEKIDS": 0,
+      "YOJ": 5,
+      "HOME_VAL": 0,
+      "MSTATUS": "Single",
+      "GENDER": "F",
+      "EDUCATION": "Masters",
+      "OCCUPATION": "Student",
+      "TRAVTIME": 15,
+      "CAR_USE": "Private",
+      "BLUEBOOK": 8000,
+      "TIF": 2,
+      "CAR_TYPE": "Sedan",
+      "RED_CAR": "yes",
+      "OLDCLAIM": 0,
+      "CLM_FREQ": 0,
+      "REVOKED": "No",
+      "MVR_PTS": 0,
+      "URBANICITY": "Urban",
+      "CAR_AGE": 5
+    },
+    "health": {
+      "age": 28,
+      "sex": "female",
+      "bmi": 22.0,
+      "children": 0,
+      "smoker": "no",
+      "region": "southeast"
+    }
+  }
+}
