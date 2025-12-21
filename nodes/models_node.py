@@ -7,10 +7,17 @@ import pickle
 import numpy as np
 import json
 import os
+import sys
 from typing import Any
 from langchain_core.messages import AIMessage
 
 from .state import ClaimState
+
+# Add project root to path for fraud module import
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, PROJECT_ROOT)
+
+from fraud.agent import fraud_agent
 
 
 # ============ LOAD MODELS ============
@@ -22,18 +29,8 @@ MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 print(f"[DEBUG] Looking for models in: {os.path.abspath(MODELS_DIR)}")
 
 # Load pickle models
-fraud_model = None
+# Note: fraud detection is handled by fraud/agent.py which loads its own models
 cost_model_health = None
-
-try:
-    fraud_model_path = os.path.join(MODELS_DIR, "insurance_model.pkl")
-    with open(fraud_model_path, "rb") as f:
-        fraud_model = pickle.load(f)
-    print(f"✓ Loaded fraud_model from {fraud_model_path}")
-except FileNotFoundError as e:
-    print(f"⚠️  insurance_model.pkl not found at {fraud_model_path}")
-except Exception as e:
-    print(f"⚠️  Error loading fraud_model: {e}")
 
 try:
     cost_model_path = os.path.join(MODELS_DIR, "cost_estimation_health_insurance.pkl")
@@ -153,14 +150,14 @@ def prepare_health_features(profile: dict) -> np.array:
     """
     sex_map = {"male": 1, "female": 0}
     smoker_map = {"yes": 1, "no": 0}
-    
+
     region = profile.get("region", "northwest")
-    
+
     # One-hot encode region (drop southwest as reference)
     region_northeast = 1 if region == "northeast" else 0
     region_northwest = 1 if region == "northwest" else 0
     region_southeast = 1 if region == "southeast" else 0
-    
+
     features = [
         profile.get("age", 30),
         encode_categorical(profile.get("sex", "male"), sex_map),
@@ -171,8 +168,52 @@ def prepare_health_features(profile: dict) -> np.array:
         region_northwest,
         region_southeast,
     ]
-    
+
     return np.array(features).reshape(1, -1)
+
+
+def extract_hour(time_str: str) -> int:
+    """Extract hour from time string like '14:00'"""
+    if not time_str:
+        return 12  # default noon
+    try:
+        return int(str(time_str).split(":")[0])
+    except:
+        return 12
+
+
+def prepare_claim_for_fraud_agent(extracted_fields: dict, profile: dict) -> dict:
+    """
+    Map LLM-extracted fields + profile to fraud model features.
+    Required features by fraud/agent.py:
+        months_as_customer, age, policy_deductable, policy_annual_premium,
+        umbrella_limit, capital-gains, capital-loss, incident_hour_of_the_day,
+        number_of_vehicles_involved, bodily_injuries, witnesses,
+        total_claim_amount, injury_claim, property_claim, vehicle_claim
+    """
+    return {
+        # From profile (customer data)
+        "months_as_customer": profile.get("months_as_customer", 12),
+        "age": profile.get("AGE", profile.get("age", 30)),
+        "policy_deductable": profile.get("policy_deductable", 1000),
+        "policy_annual_premium": profile.get("policy_annual_premium", 1200),
+        "umbrella_limit": profile.get("umbrella_limit", 0),
+        "capital-gains": profile.get("capital-gains", 0),
+        "capital-loss": profile.get("capital-loss", 0),
+
+        # From extracted fields (incident data)
+        "incident_hour_of_the_day": extract_hour(extracted_fields.get("accident_time")),
+        "number_of_vehicles_involved": 2 if extracted_fields.get("other_party_involved") else 1,
+        "bodily_injuries": 1 if extracted_fields.get("injuries") else 0,
+        "witnesses": 1 if extracted_fields.get("witness_present") else 0,
+        "total_claim_amount": extracted_fields.get("total_amount", 0) or 0,
+
+        # Claim breakdown (defaults if not provided)
+        "injury_claim": extracted_fields.get("injury_claim", 0) or 0,
+        "property_claim": extracted_fields.get("property_claim", 0) or 0,
+        "vehicle_claim": extracted_fields.get("vehicle_claim", 0) or 0,
+    }
+
 
 # ============ MODEL PREDICTION FUNCTIONS ============
 
@@ -201,26 +242,11 @@ def cost_model_predict(claim_type: str, extracted_fields: dict, profile: dict) -
         return base_costs.get(claim_type, 1000.0), {"model": "stub"}
 
 
-def fraud_model_predict(claim_type: str, extracted_fields: dict, profile: dict) -> tuple[float, dict]:
+def acceptance_model_predict(fraud_score: float) -> tuple[float, dict]:
     """
-    Predict fraud probability using ML model.
+    Predict acceptance probability based on fraud score.
     """
-    if claim_type == "auto" and fraud_model is not None:
-        features = prepare_auto_features(profile)
-        # Assuming fraud_model returns probability
-        fraud_prob = float(fraud_model.predict_proba(features)[0][1])  # probability of fraud class
-        return fraud_prob, {"model": "auto_fraud_ml_v1", "features_used": len(features[0])}
-    
-    # Stub for other types
-    return 0.08, {"model": "fraud_stub"}
-
-
-def acceptance_model_predict(claim_type: str, extracted_fields: dict, profile: dict) -> tuple[float, dict]:
-    """
-    Predict acceptance probability.
-    """
-    # Stub - inverse of fraud score for now
-    fraud_score, _ = fraud_model_predict(claim_type, extracted_fields, profile)
+    # Inverse of fraud score
     acceptance = 1.0 - fraud_score
     return acceptance, {"model": "acceptance_derived_from_fraud"}
 
@@ -249,57 +275,68 @@ def run_cost_model(state: ClaimState) -> ClaimState:
     
     model_meta = state.get("model_meta") or {}
     model_meta["cost"] = meta
-    
-    return {"predicted_cost": cost, "model_meta": model_meta}
+
+    return {"predicted_cost": float(cost), "model_meta": model_meta}  # Convert numpy.float64 to float
 
 
 def run_fraud_model(state: ClaimState) -> ClaimState:
-    """Run the fraud detection model."""
+    """Run the REAL fraud detection using fraud/agent.py."""
     claim_type = state.get("claim_type", "unknown")
     structured = state.get("structured_claims", {})
     extracted_fields = structured.get(claim_type, {})
-    
+
     # Get user profile
     user_id = "user_123"  # TODO: Get from state
     profile = get_user_profile_data(user_id, claim_type)
-    
-    print(f"\n[FRAUD MODEL]")
+
+    # Prepare claim dict for fraud agent (needs specific features)
+    claim_dict = prepare_claim_for_fraud_agent(extracted_fields, profile)
+
+    print(f"\n[FRAUD MODEL - Real Agent]")
     print(f"  Claim type: {claim_type}")
-    print(f"  Extracted fields: {extracted_fields}")
-    print(f"  Profile data: {profile}")
-    
-    fraud, meta = fraud_model_predict(claim_type, extracted_fields, profile)
-    
-    print(f"  → Fraud score: {fraud:.1%}")
-    print(f"  → Model: {meta.get('model')}")
-    
+    print(f"  Fraud features: {claim_dict}")
+
+    # Call the real fraud agent
+    fraud_result = fraud_agent(claim_dict)
+
+    print(f"  → Fraud score: {fraud_result['fraud_score']:.1%}")
+    print(f"  → Risk level: {fraud_result['risk_level']}")
+    print(f"  → Signals: {fraud_result['signals']}")
+    print(f"  → Decision: {fraud_result['decision']}")
+
     model_meta = state.get("model_meta") or {}
-    model_meta["fraud"] = meta
-    
-    return {"fraud_score": fraud, "model_meta": model_meta}
+    model_meta["fraud"] = {
+        "model": "fraud_agent_v1",
+        "risk_level": fraud_result["risk_level"],
+        "decision": fraud_result["decision"]
+    }
+
+    return {
+        "fraud_score": float(fraud_result["fraud_score"]),  # Convert numpy.float64 to float
+        "fraud_risk_level": fraud_result["risk_level"],
+        "fraud_signals": fraud_result["signals"],
+        "fraud_decision": fraud_result["decision"],
+        "model_meta": model_meta
+    }
 
 
 def run_acceptance_model(state: ClaimState) -> ClaimState:
-    """Run the acceptance probability model."""
+    """Run the acceptance probability model based on fraud score."""
     claim_type = state.get("claim_type", "unknown")
-    structured = state.get("structured_claims", {})
-    extracted_fields = structured.get(claim_type, {})
-    
-    # Get user profile
-    user_id = "user_123"  # TODO: Get from state
-    profile = get_user_profile_data(user_id, claim_type)
-    
+    fraud_score = state.get("fraud_score", 0.0)
+
     print(f"\n[ACCEPTANCE MODEL]")
     print(f"  Claim type: {claim_type}")
-    
-    prob, meta = acceptance_model_predict(claim_type, extracted_fields, profile)
-    
+    print(f"  Using fraud score: {fraud_score:.1%}")
+
+    prob, meta = acceptance_model_predict(fraud_score)
+
     print(f"  → Acceptance probability: {prob:.1%}")
     print(f"  → Model: {meta.get('model')}")
-    
+
     model_meta = state.get("model_meta") or {}
     model_meta["acceptance"] = meta
-    
+
     return {"acceptance_probability": prob, "model_meta": model_meta}
 
 
@@ -308,17 +345,27 @@ def finalize_claim(state: ClaimState) -> ClaimState:
     claim_type = state.get("claim_type", "unknown")
     cost = state.get("predicted_cost", 0.0)
     fraud = state.get("fraud_score", 0.0)
+    fraud_level = state.get("fraud_risk_level", "UNKNOWN")
+    fraud_signals = state.get("fraud_signals", [])
+    fraud_decision = state.get("fraud_decision", "PENDING")
     acceptance = state.get("acceptance_probability", 0.0)
-    
+
+    # Build signals string
+    signals_str = ", ".join(fraud_signals) if fraud_signals else "None"
+
     reply = (
         f"\n{'='*50}\n"
         f"CLAIM PROCESSED\n"
         f"{'='*50}\n"
         f"Type: {claim_type.upper()}\n"
         f"Estimated Cost: ${cost:,.2f}\n"
-        f"Fraud Risk: {fraud:.1%}\n"
-        f"Acceptance Probability: {acceptance:.1%}\n"
+        f"\n--- Fraud Analysis ---\n"
+        f"Fraud Score: {fraud:.1%}\n"
+        f"Risk Level: {fraud_level}\n"
+        f"Signals: {signals_str}\n"
+        f"Decision: {fraud_decision}\n"
+        f"\nAcceptance Probability: {acceptance:.1%}\n"
         f"{'='*50}"
     )
-    
+
     return {"messages": [AIMessage(content=reply)]}

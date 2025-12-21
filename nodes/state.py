@@ -32,5 +32,8 @@ class ClaimState(TypedDict, total=False):
     # Model prediction outputs
     predicted_cost: float
     fraud_score: float
+    fraud_risk_level: str  # LOW, MEDIUM, HIGH
+    fraud_signals: list[str]  # e.g., ["nouveau client", "aucun témoin"]
+    fraud_decision: str  # AUTO_APPROVE or FLAG_FOR_REVIEW
     acceptance_probability: float
     model_meta: dict[str, Any]

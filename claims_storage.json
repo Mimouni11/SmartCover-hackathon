@@ -1,0 +1,23 @@
+{
+  "claims": [
+    {
+      "id": "CLM-20251221-061145",
+      "user_id": "user_123",
+      "thread_id": "thread_20251221_060254",
+      "type": "Home",
+      "company": "BH Assurance",
+      "amount": 3500.0,
+      "status": "pending",
+      "date": "2025-12-21",
+      "description": "",
+      "fraudScore": 0.27,
+      "fraud_risk_level": "LOW",
+      "fraud_signals": [
+        "aucun témoin"
+      ],
+      "fraud_decision": "AUTO_APPROVE",
+      "acceptance_probability": 0.73,
+      "structured_data": {}
+    }
+  ]
+}
